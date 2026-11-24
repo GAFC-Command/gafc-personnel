@@ -32,7 +32,7 @@
   function fmtDate(v) { if (!v) return ""; var d = new Date(v); return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
   function today() { var d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
   function rpc(name, args) { return sb.rpc(name, args).then(function (r) { if (r.error) throw new Error(r.error.message); return r.data; }); }
-  function fail(e) { toast(e.message || String(e), true); }
+  function fail(e) { toast(e.message || String(e), true); } function callFn(path, body) { return fetch(C.functions + path, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + S.session.access_token }, body: JSON.stringify(body) }).then(function (r) { return r.json().then(function (b) { return { ok: r.ok, body: b }; }, function () { return { ok: r.ok, body: {} }; }); }); } async function makeUnitChannels(id) { var r = await callFn("/unit-setup", { unit_id: id }); setTimeout(function () { if (r.ok && r.body.ok) toast("Discord role, category, and channels created"); else toast("Unit saved. Discord channels failed: " + (r.body.error || "unknown error"), true); }, 700); }
 
   // ---------- Sign-in ----------
   function clearSyncFlags() { try { Object.keys(sessionStorage).forEach(function (k) { if (k.indexOf("gafc_synced_") === 0) sessionStorage.removeItem(k); }); } catch (e) { /* storage unavailable */ } }
@@ -378,7 +378,7 @@
             h("button", { class: "primary", text: "Save", onclick: run(function () {
               var roles = Array.prototype.map.call(rolesBox.querySelectorAll("input:checked"), function (c) { return c.getAttribute("data-r"); });
               if (roles.indexOf("soldier") < 0) roles.push("soldier");
-              return rpc("rpc_set_member", { p_discord: x.discord_id, p_rank: intOrNull(rk.value), p_billet: intOrNull(bl.value), p_unit: intOrNull(un.value), p_status: st.value, p_roles: roles });
+              return rpc("rpc_set_member", { p_discord: x.discord_id, p_rank: intOrNull(rk.value), p_billet: intOrNull(bl.value), p_unit: intOrNull(un.value), p_status: st.value, p_roles: roles }).then(function () { return callFn("/member-unit", { discord_id: x.discord_id }); });
             }) })]));
         });
       };
@@ -405,13 +405,13 @@
         return o;
       };
       var add = {}, addRow = h("div", { class: "row" }, cfg.cols.map(function (c) { add[c[0]] = fieldFor(c, ""); return h("div", {}, [h("label", { class: "lab", text: c[1] }), add[c[0]]]); }));
-      box.appendChild(h("div", { class: "card" }, [h("strong", { text: "Add new" }), addRow, h("button", { class: "primary", style: "margin-top:10px", text: "Add", onclick: run(async function () { var r = await sb.from(cfg.table).insert(collect(add)); if (r.error) throw new Error(r.error.message); }) })]));
+      box.appendChild(h("div", { class: "card" }, [h("strong", { text: "Add new" }), addRow, h("button", { class: "primary", style: "margin-top:10px", text: "Add", onclick: run(async function () { var q = sb.from(cfg.table).insert(collect(add)); var r = cfg.table === "units" ? await q.select("id").single() : await q; if (r.error) throw new Error(r.error.message); if (cfg.table === "units") await makeUnitChannels(r.data.id); }) })]));
       (cfg.rows || []).forEach(function (row) {
         var ctls = {}, line = h("div", { class: "row" }, cfg.cols.map(function (c) { ctls[c[0]] = fieldFor(c, row[c[0]]); return h("div", {}, [h("label", { class: "lab", text: c[1] }), ctls[c[0]]]); }));
         box.appendChild(h("div", { class: "card" }, [line, h("div", { class: "row", style: "margin-top:10px" }, [
           h("button", { text: "Save", onclick: run(async function () { var r = await sb.from(cfg.table).update(collect(ctls)).eq("id", row.id); if (r.error) throw new Error(r.error.message); }) }),
           h("button", { class: row.retired ? "" : "danger", text: row.retired ? "Restore" : "Retire", onclick: run(async function () { var r = await sb.from(cfg.table).update({ retired: !row.retired }).eq("id", row.id); if (r.error) throw new Error(r.error.message); }) }),
-          row.retired ? h("span", { class: "pill red", text: "Retired" }) : null])]));
+          cfg.table === "units" && !row.category_id ? h("button", { text: "Create Discord channels", onclick: run(async function () { await makeUnitChannels(row.id); }) }) : null, row.retired ? h("span", { class: "pill red", text: "Retired" }) : null])]));
       });
       box.appendChild(h("p", { class: "muted", text: "Entries are retired, never deleted, so older documents keep their meaning." + (tab === "articles" ? " Edit the five starter articles to match your real infraction list." : "") }));
       return;
