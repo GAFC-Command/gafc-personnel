@@ -1,0 +1,1 @@
+window.GAFC_LOGO = "";
