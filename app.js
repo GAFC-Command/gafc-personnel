@@ -168,11 +168,11 @@
   async function viewRoster() {
     var m = $("#main"); m.appendChild(h("h1", { text: "Roster" }));
     var search = h("input", { placeholder: "Search by username", oninput: draw });
-    m.appendChild(search); var box = h("div"); m.appendChild(box);
+    var unitFilter = opt(S.units, "Unit", "id", function (u) { return u.name; }, "All units"); unitFilter.onchange = function () { draw(); }; m.appendChild(h("div", { class: "row" }, [search, unitFilter])); var box = h("div"); m.appendChild(box);
     var rows = S.roster.slice().sort(function (a, b) { return (b.rank_id ? S.ranks.findIndex(function (r) { return r.id === b.rank_id; }) : -1) - (a.rank_id ? S.ranks.findIndex(function (r) { return r.id === a.rank_id; }) : -1); });
     function draw() {
       var t = search.value.toLowerCase(); box.textContent = "";
-      var list = rows.filter(function (r) { return !t || r.username.toLowerCase().indexOf(t) >= 0; });
+      var uf = unitFilter.value ? parseInt(unitFilter.value, 10) : null; var list = rows.filter(function (r) { return (!t || r.username.toLowerCase().indexOf(t) >= 0) && (uf === null || r.unit_id === uf); });
       box.appendChild(h("table", {}, [h("tr", {}, ["Rank", "Username", "Billet", "Unit", "Status"].map(function (x) { return h("th", { text: x }); }))].concat(list.map(function (r) {
         return h("tr", {}, [h("td", { text: rankName(r.rank_id) }), h("td", {}, [isLeader() ? h("a", { href: "#/member/" + r.discord_id, text: r.username }) : r.username]),
           h("td", { text: billetName(r.billet_id) }), h("td", { text: unitName(r.unit_id) }), h("td", { text: r.status === "on_loa" ? "On LOA" : "Active" })]);
@@ -389,7 +389,7 @@
 
     if (tab === "units" || tab === "ranks" || tab === "billets" || tab === "articles") {
       var cfg = {
-        units: { table: "units", cols: [["name", "Name"], ["parent_id", "Parent unit", "unit"]], rows: (await sb.from("units").select("*").order("name")).data },
+        units: { table: "units", cols: [["name", "Name"], ["parent_id", "Parent unit", "unit"], ["channel_counselings", "Unit counselings channel ID"], ["channel_awards", "Unit awards channel ID"], ["channel_command", "Unit command channel ID"], ["channel_admin", "Unit admin alerts channel ID"]], rows: (await sb.from("units").select("*").order("name")).data },
         ranks: { table: "ranks", cols: [["name", "Name"], ["abbr", "Abbreviation"], ["sort", "Order (higher is senior)", "int"], ["discord_role_id", "Discord role ID"]], rows: (await sb.from("ranks").select("*").order("sort")).data },
         billets: { table: "billets", cols: [["name", "Name"], ["unit_id", "Unit", "unit"], ["discord_role_id", "Discord role ID"]], rows: (await sb.from("billets").select("*").order("name")).data },
         articles: { table: "infraction_articles", cols: [["article_no", "Article"], ["title", "Title"], ["body", "Description"]], rows: (await sb.from("infraction_articles").select("*").order("article_no")).data }
