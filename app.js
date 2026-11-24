@@ -168,7 +168,7 @@
   async function viewRoster() {
     var m = $("#main"); m.appendChild(h("h1", { text: "Roster" }));
     var search = h("input", { placeholder: "Search by username", oninput: draw });
-    var unitFilter = opt(S.units, "Unit", "id", function (u) { return u.name; }, "All units"); unitFilter.onchange = function () { draw(); }; m.appendChild(h("div", { class: "row" }, [search, unitFilter])); var box = h("div"); m.appendChild(box);
+    var unitFilter = opt(S.units.filter(function (u) { return !u.retired; }), "Unit", "id", function (u) { return u.name; }, "All units"); unitFilter.onchange = function () { draw(); }; m.appendChild(h("div", { class: "row" }, [search, unitFilter])); var box = h("div"); m.appendChild(box);
     var rows = S.roster.slice().sort(function (a, b) { return (b.rank_id ? S.ranks.findIndex(function (r) { return r.id === b.rank_id; }) : -1) - (a.rank_id ? S.ranks.findIndex(function (r) { return r.id === a.rank_id; }) : -1); });
     function draw() {
       var t = search.value.toLowerCase(); box.textContent = "";
