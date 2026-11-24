@@ -370,7 +370,7 @@
         all.filter(function (x) { return !f.value || x.username.toLowerCase().indexOf(f.value.toLowerCase()) >= 0; }).forEach(function (x) {
           var rk = opt(S.ranks, "Rank", "id", function (r) { return r.abbr + " - " + r.name; }, "No rank"); rk.value = x.rank_id || "";
           var bl = opt(S.billets, "Billet", "id", function (b) { return b.name; }, "No billet"); bl.value = x.billet_id || "";
-          var un = opt(S.units, "Unit", "id", function (u) { return u.name; }, "No unit"); un.value = x.unit_id || "";
+          var un = opt(S.units.filter(function (u) { return !u.retired || u.id === x.unit_id; }), "Unit", "id", function (u) { return u.name; }, "No unit"); un.value = x.unit_id || "";
           var st = h("select", {}, ["active", "on_loa", "discharged", "blacklisted", "denied", "applicant"].map(function (s) { return h("option", { value: s, text: s }); })); st.value = x.status;
           var rolesBox = h("div", { class: "checks" }, SITE_ROLES.map(function (r) { var c = h("input", { type: "checkbox", "data-r": r }); c.checked = x.site_roles.indexOf(r) >= 0; return h("label", { class: "chk" }, [c, h("span", { text: r })]); }));
           list.appendChild(h("div", { class: "card" }, [h("strong", { text: x.username }), h("span", { class: "muted", text: "  " + x.discord_id }),
@@ -394,7 +394,7 @@
         billets: { table: "billets", cols: [["name", "Name"], ["unit_id", "Unit", "unit"], ["discord_role_id", "Discord role ID"]], rows: (await sb.from("billets").select("*").order("name")).data },
         articles: { table: "infraction_articles", cols: [["article_no", "Article"], ["title", "Title"], ["body", "Description"]], rows: (await sb.from("infraction_articles").select("*").order("article_no")).data }
       }[tab];
-      var unitSel = function (v) { var s = opt(S.units, "Unit", "id", function (u) { return u.name; }, "None"); s.value = v || ""; return s; };
+      var unitSel = function (v) { var s = opt(S.units.filter(function (u) { return !u.retired || u.id === v; }), "Unit", "id", function (u) { return u.name; }, "None"); s.value = v || ""; return s; };
       var fieldFor = function (c, v) {
         if (c[2] === "unit") return unitSel(v);
         var i = h("input", { type: c[2] === "int" ? "number" : "text", value: v === null || v === undefined ? "" : String(v) }); return i;
@@ -410,7 +410,7 @@
         var ctls = {}, line = h("div", { class: "row" }, cfg.cols.map(function (c) { ctls[c[0]] = fieldFor(c, row[c[0]]); return h("div", {}, [h("label", { class: "lab", text: c[1] }), ctls[c[0]]]); }));
         box.appendChild(h("div", { class: "card" }, [line, h("div", { class: "row", style: "margin-top:10px" }, [
           h("button", { text: "Save", onclick: run(async function () { var r = await sb.from(cfg.table).update(collect(ctls)).eq("id", row.id); if (r.error) throw new Error(r.error.message); }) }),
-          h("button", { class: row.retired ? "" : "danger", text: row.retired ? "Restore" : "Retire", onclick: run(async function () { var r = await sb.from(cfg.table).update({ retired: !row.retired }).eq("id", row.id); if (r.error) throw new Error(r.error.message); }) }),
+          h("button", { class: row.retired ? "" : "danger", text: row.retired ? "Restore" : "Retire", onclick: run(async function () { var r = await sb.from(cfg.table).update({ retired: !row.retired }).eq("id", row.id); if (r.error) throw new Error(r.error.message); if (cfg.table === "units") { var a = await callFn("/unit-archive", { unit_id: row.id, archived: !row.retired }); setTimeout(function () { if (!(a.ok && a.body.ok)) toast("Unit updated. Discord channels not changed: " + (a.body.error || "unknown error"), true); else if (!a.body.skipped) toast(!row.retired ? "Discord channels locked" : "Discord channels restored"); }, 700); } }) }),
           cfg.table === "units" && !row.category_id ? h("button", { text: "Create Discord channels", onclick: run(async function () { await makeUnitChannels(row.id); }) }) : null, row.retired ? h("span", { class: "pill red", text: "Retired" }) : null])]));
       });
       box.appendChild(h("p", { class: "muted", text: "Entries are retired, never deleted, so older documents keep their meaning." + (tab === "articles" ? " Edit the five starter articles to match your real infraction list." : "") }));
